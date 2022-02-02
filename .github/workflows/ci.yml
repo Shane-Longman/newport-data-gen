@@ -1,0 +1,21 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - 'main'
+      - 'develop'
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+    runs-on: ubuntu-20.04
+    env:
+      OSSL_MAKEFLAGS: -j2
+      OSSL_FLAGS: -march=native
+    steps:
+    - uses: actions/checkout@v2
+    - name: Build
+      run: |
+        make
