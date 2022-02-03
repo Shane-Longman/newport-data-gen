@@ -3,10 +3,10 @@ OSSL_MAKEFLAGS?=-j4
 OSSL_FLAGS?="-march=native"
 
 #main: openssl-OpenSSL_0_9_8h/libcrypto.a
-main: $(OSSL_DIR)/libcrypto.a main.cpp parse_args.cpp parse_args.hpp
+main: $(OSSL_DIR)/libcrypto.a main.cpp parse_args.cpp parse_args.hpp unaddr.cpp unaddr.hpp ntohl.h
 	$(CXX) \
-    main.cpp parse_args.cpp -o main \
-    -std=c++17 \
+    main.cpp parse_args.cpp unaddr.cpp -o main \
+    -std=c++17 -march=native \
     $(OSSL_DIR)/libcrypto.a \
     -I$(OSSL_DIR) \
     -I$(OSSL_DIR)/include \
