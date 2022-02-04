@@ -13,7 +13,8 @@ main: $(OSSL_DIR)/libcrypto.a main.cpp parse_args.cpp parse_args.hpp unaddr.cpp 
     -O0 -ggdb
 
 $(OSSL_DIR)/libcrypto.a: $(OSSL_DIR)/config Makefile
-	cd $(OSSL_DIR) && ./config no-threads no-shared no-rc2 no-rc4 no-rc5 no-idea no-des no-bf no-cast no-camellia no-seed no-dh no-asm $(OSSL_FLAGS) && cd ..
+	patch --forward -p0 < patches/openssl-x86_64-bintuils-2.20.51.patch; [ $$? -lt 2 ]
+	cd $(OSSL_DIR) && ./config no-threads no-shared no-rc2 no-rc4 no-rc5 no-idea no-des no-bf no-cast no-camellia no-seed no-dh $(OSSL_FLAGS) && cd ..
 	$(MAKE) -C $(OSSL_DIR) $(OSSL_MAKEFLAGS) depend
 	$(MAKE) -C $(OSSL_DIR) $(OSSL_MAKEFLAGS) build_crypto
 

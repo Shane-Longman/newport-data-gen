@@ -3,6 +3,8 @@ main
 openssl-OpenSSL_0_9_8h.zip
 *.o
 *.a
+*.s
+*.rej
 openssl-OpenSSL_0_9_8h/Makefile
 openssl-OpenSSL_0_9_8h/test
 *.save
