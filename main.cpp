@@ -14,39 +14,18 @@
 #include <unistd.h>
 
 
+using uncompressed_key_t = std::array<std::uint8_t, 65>;
 using hash256_t = std::array<std::uint8_t, 32>;
 
-
-// this is spectacularly optimized by clang, even as old as 5.0:
-//        vmovups xmm0, xmmword ptr [rdi]
-//        vmovss  xmm1, dword ptr [rdi + 16]      # xmm1 = mem[0],zero,zero,zero
-//        vinsertf128     ymm0, ymm0, xmm1, 1
-#define HASH160_AS_V32(h) (__v32qi)_mm256_set_epi8( \
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, \
-        h[19], h[18], h[17], h[16], h[15], h[14], h[13], h[12], h[11], h[10], \
-        h[9], h[8], h[7], h[6], h[5], h[4], h[3], h[2], h[1], h[0])
-
-
-#if 0
-static inline
-__v32qi hash160_as_v32(std::uint8_t const *p)
+typedef union
 {
-    // this needs gcc at least 10.0 to compile into efficient
-    // AVX assembly
-    __m128i hi = _mm_set_epi8(
-        p[19], p[18], p[17], p[16], p[15], p[14], p[13], p[12],
-        p[11], p[10], p[ 9], p[ 8], p[ 7], p[ 6], p[ 5], p[ 4]);
-    hi = (__m128i)_mm_permute_ps((__m128)hi, 0b11111111);
-    hi = _mm_blend_epi32(hi, _mm_setzero_si128(), 0b1110);
-
-    __m128i lo = _mm_set_epi8(
-        p[15], p[14], p[13], p[12], p[11], p[10], p[ 9], p[ 8],
-        p[ 7], p[ 6], p[ 5], p[ 4], p[ 3], p[ 2], p[ 1], p[ 0]);
-    __m256i full = _mm256_setr_m128i(lo, hi); // needs gcc at least 8.1
-
-    return full;
-}
-#endif
+    __v32qi v32;
+    __m256i m256;
+    hash160_t h160;
+    hash256_t h256;
+} hash_4_simd_t;
+static_assert(sizeof (hash160_t) == 20u);
+static_assert(sizeof (hash256_t) == 32u);
 
 
 static inline
@@ -120,6 +99,24 @@ __v32qi SHL(__v32qi iv, unsigned int imm)
 }
 
 
+static inline
+std::array<__v32qi, 160> make_masks(unsigned int match_nbits)
+{
+    auto const NMASK_CHECKS = 1 + 160 - match_nbits;
+    std::array<__v32qi, 160> masks;
+
+    __v32qi mask = SHR((__v32qi)(~_mm256_setzero_si256()), 256 - match_nbits);
+
+    for (auto ix = 0u; ix < NMASK_CHECKS; ++ix)
+    {
+        masks[ix] = mask;
+        mask = SHL(mask, 1);
+    }
+    
+    return masks;
+}
+
+
 int main(int argc, char **argv)
 {
     parsed_args args;
@@ -135,17 +132,23 @@ int main(int argc, char **argv)
     }
 
     // 160-bit hash
-    auto const ih160 = unaddr(args.pubkey);
-    auto const target = HASH160_AS_V32(ih160);
+    hash_4_simd_t target;
+    target.h160 = unaddr(args.pubkey);
 
     pid_t const pid = getpid();
 
     EC_KEY *key_p = EC_KEY_new_by_curve_name(NID_secp256k1);
-    std::array<std::uint8_t, 65> uncompressed;
+    uncompressed_key_t uncompressed;
 
     bool const infinite_loop = not args.maybe_ntries.has_value();
     auto const ntries = args.maybe_ntries.has_value() ? *args.maybe_ntries : 0;
-    
+
+    auto const NMASK_CHECKS = 1 + 160 - args.min_match_nbits;
+    std::array<__v32qi, 160> const masks = make_masks(args.min_match_nbits);
+
+    hash256_t h256;
+    hash_4_simd_t h160;
+
     for (std::uint64_t it = 0; infinite_loop or (it < ntries); ++it)
     {
         EC_KEY_generate_key(key_p);
@@ -153,25 +156,17 @@ int main(int argc, char **argv)
         auto uncompressed_p = uncompressed.data();
         i2o_ECPublicKey(key_p, &uncompressed_p);
 
-        hash256_t h256;
         SHA256(uncompressed.data(), uncompressed.size(), h256.data());
+        RIPEMD160(h256.data(), h256.size(), h160.h160.data());
 
-        hash160_t h160;
-        RIPEMD160(h256.data(), h256.size(), h160.data());
+        auto const diff = target.v32 ^ h160.v32;
 
-        auto const diff = target ^ HASH160_AS_V32(h160);
-
-        auto mask = SHR((__v32qi)(~_mm256_setzero_si256()), 256 - args.min_match_nbits);
-
-        auto const NCHECKS = 1 + 160 - args.min_match_nbits;
-        // TODO: mask array
-        for (auto ix = 0u; ix < NCHECKS; ++ix)
+        for (auto ix = 0u; ix < NMASK_CHECKS; ++ix)
         {
-            if (_mm256_testz_si256((__m256i)diff, (__m256i)mask) == 1)
+            if (_mm256_testz_si256((__m256i)diff, (__m256i)masks[ix]) == 1)
             {
                 printf("%u\n", ix);
             }
-            mask = SHL(mask, 1);
         }
     }
 
