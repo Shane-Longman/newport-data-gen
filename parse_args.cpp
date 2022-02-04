@@ -17,6 +17,26 @@ int parse_args(int argc, char* argv[], parsed_args & parsed)
         {
             switch (c)
             {
+                case 'n':
+                {
+                    if (--argc > 0)
+                    {
+                        auto val = atoll(argv[1]);
+                        if (val >= 1)
+                        {
+                            parsed.maybe_ntries = val;
+                        }
+                        else
+                        {
+                            fprintf(stderr, "Invalid number of tries passed: %s\n", argv[1]);
+                            argc = 0;
+                        }
+
+                        argv++;
+                        *argv+= strlen(*argv) - 1;
+                    }
+                    break;
+                }
                 case 'h':
                     show_help = true;
                     parsed.help = show_help;
@@ -54,6 +74,7 @@ int parse_args(int argc, char* argv[], parsed_args & parsed)
             "\n"
             "Usage: main [options] <Number of bits to match:UINT> <Public key:STRING>\n\n"
             "Options:\n"
+            "         -n UINT64 number of tries, >= 1\n"
             "         -h        show help\n");
 
         return show_help ? EXIT_SUCCESS : EXIT_FAILURE;

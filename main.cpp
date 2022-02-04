@@ -61,7 +61,7 @@ __v32qi SHR(__v32qi iv, unsigned int imm)
         data = _mm256_permute4x64_epi64(data, 0b00'11'10'01);
         data = _mm256_blend_epi32(_mm256_setzero_si256(), data, 0b0'0'1'1'1'1'1'1);
     }
-    
+
     if (imm == 0)
     {
         return (__v32qi)data;
@@ -143,7 +143,10 @@ int main(int argc, char **argv)
     EC_KEY *key_p = EC_KEY_new_by_curve_name(NID_secp256k1);
     std::array<std::uint8_t, 65> uncompressed;
 
-    while (true)
+    bool const infinite_loop = not args.maybe_ntries.has_value();
+    auto const ntries = args.maybe_ntries.has_value() ? *args.maybe_ntries : 0;
+    
+    for (std::uint64_t it = 0; infinite_loop or (it < ntries); ++it)
     {
         EC_KEY_generate_key(key_p);
 
