@@ -12,7 +12,8 @@ struct parsed_args
 {
     bool help = false;
     unsigned int min_match_nbits;
-    std::string pubkey;
+    std::optional<std::string> maybe_address;
+    std::optional<std::string> maybe_address_fname;
     std::optional<std::uint64_t> maybe_ntries;
 };
 

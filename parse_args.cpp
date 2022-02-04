@@ -7,7 +7,7 @@
 
 int parse_args(int argc, char* argv[], parsed_args & parsed)
 {
-    auto constexpr N_REQUIRED = 2u;
+    auto constexpr N_REQUIRED = 1u;
     bool show_help = false;
     int c = 0;
 
@@ -31,6 +31,28 @@ int parse_args(int argc, char* argv[], parsed_args & parsed)
                             fprintf(stderr, "Invalid number of tries passed: %s\n", argv[1]);
                             argc = 0;
                         }
+
+                        argv++;
+                        *argv+= strlen(*argv) - 1;
+                    }
+                    break;
+                }
+                case 'a':
+                {
+                    if (--argc > 0)
+                    {
+                        parsed.maybe_address = argv[1];
+
+                        argv++;
+                        *argv+= strlen(*argv) - 1;
+                    }
+                    break;
+                }
+                case 'i':
+                {
+                    if (--argc > 0)
+                    {
+                        parsed.maybe_address_fname = argv[1];
 
                         argv++;
                         *argv+= strlen(*argv) - 1;
@@ -63,18 +85,24 @@ int parse_args(int argc, char* argv[], parsed_args & parsed)
         }
     }
 
-    if (show_help or (argc != N_REQUIRED))
+    if (show_help or (argc != N_REQUIRED) or (not parsed.maybe_address and not parsed.maybe_address_fname))
     {
         if (argc != N_REQUIRED)
         {
             fprintf(stderr, "Missing required arguments.\n");
         }
+        if (not parsed.maybe_address and not parsed.maybe_address_fname)
+        {
+            fprintf(stderr, "Either or both -a and -i option must be specified.\n");
+        }
 
         fprintf(stderr,
             "\n"
-            "Usage: main [options] <Number of bits to match:UINT> <Public key:STRING>\n\n"
+            "Usage: main [options] <Number of bits to match:UINT>\n\n"
             "Options:\n"
             "         -n UINT64 number of tries, >= 1\n"
+            "         -a STR    single input address\n"
+            "         -i STR    file name with input address(es), one per line\n"
             "         -h        show help\n");
 
         return show_help ? EXIT_SUCCESS : EXIT_FAILURE;
@@ -82,7 +110,6 @@ int parse_args(int argc, char* argv[], parsed_args & parsed)
     else
     {
         parsed.min_match_nbits = atoi(argv[0]);
-        parsed.pubkey = argv[1];
     }
 
     return EXIT_SUCCESS;

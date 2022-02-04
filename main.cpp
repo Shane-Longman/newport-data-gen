@@ -4,6 +4,10 @@
 #include <cstdlib>
 #include <cstdint>
 #include <array>
+#include <vector>
+#include <fstream>
+#include <cctype>
+#include <algorithm>
 
 #include <openssl/ec.h>
 #include <openssl/objects.h>
@@ -27,8 +31,14 @@ typedef union
 static_assert(sizeof (hash160_t) == 20u);
 static_assert(sizeof (hash256_t) == 32u);
 
+typedef struct
+{
+    std::vector<std::string> addresses;
+    std::vector<hash_4_simd_t> hashes;
+} targets_soa_t;
 
-static inline
+
+static
 __v32qi SHR(__v32qi iv, unsigned int imm)
 {
     // [1234][5678][9ABC][DEFG]
@@ -63,7 +73,7 @@ __v32qi SHR(__v32qi iv, unsigned int imm)
     return (__v32qi)data;
 }
 
-static inline
+static
 __v32qi SHL(__v32qi iv, unsigned int imm)
 {
     // [1234][5678][9ABC][DEFG]
@@ -99,7 +109,7 @@ __v32qi SHL(__v32qi iv, unsigned int imm)
 }
 
 
-static inline
+static
 std::array<__v32qi, 160> make_masks(unsigned int match_nbits)
 {
     auto const NMASK_CHECKS = 1 + 160 - match_nbits;
@@ -117,6 +127,25 @@ std::array<__v32qi, 160> make_masks(unsigned int match_nbits)
 }
 
 
+static
+void read_targets_from_file(std::string const & ifname, targets_soa_t & targets)
+{
+    std::ifstream fcsv(ifname);
+
+    for (std::string line; std::getline(fcsv, line); /* nop */)
+    {
+        line.erase(
+            std::remove_if(line.begin(), line.end(),
+                [](unsigned char x){ return std::isspace(x); }),
+            line.end());
+        hash_4_simd_t h = {.h160 = unaddr(line)};
+        targets.addresses.push_back(line);
+        targets.hashes.push_back(h);
+    }
+    fcsv.close();
+}
+
+
 int main(int argc, char **argv)
 {
     parsed_args args;
@@ -131,9 +160,20 @@ int main(int argc, char **argv)
         return EXIT_SUCCESS;
     }
 
-    // 160-bit hash
-    hash_4_simd_t target;
-    target.h160 = unaddr(args.pubkey);
+    targets_soa_t targets;
+    if (args.maybe_address)
+    {
+        hash_4_simd_t h = {.h160 = unaddr(*args.maybe_address)};
+        targets.addresses.push_back(*args.maybe_address);
+        targets.hashes.push_back(h);
+    }
+    if (args.maybe_address_fname)
+    {
+        read_targets_from_file(*args.maybe_address_fname, targets);
+    }
+
+    auto const NTARGETS = targets.hashes.size();
+    printf("[i] %zu targets.\n", NTARGETS);
 
     pid_t const pid = getpid();
 
@@ -159,13 +199,16 @@ int main(int argc, char **argv)
         SHA256(uncompressed.data(), uncompressed.size(), h256.data());
         RIPEMD160(h256.data(), h256.size(), h160.h160.data());
 
-        auto const diff = target.v32 ^ h160.v32;
-
-        for (auto ix = 0u; ix < NMASK_CHECKS; ++ix)
+        for (auto tix = 0u; tix < NTARGETS; ++tix)
         {
-            if (_mm256_testz_si256((__m256i)diff, (__m256i)masks[ix]) == 1)
+            auto const diff = targets.hashes[tix].v32 ^ h160.v32;
+
+            for (auto ix = 0u; ix < NMASK_CHECKS; ++ix)
             {
-                printf("%u\n", ix);
+                if (_mm256_testz_si256((__m256i)diff, (__m256i)masks[ix]) == 1)
+                {
+                    printf("%s %u\n", targets.addresses[tix].c_str(), ix);
+                }
             }
         }
     }

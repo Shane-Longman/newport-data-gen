@@ -123,7 +123,7 @@ hash160_t unaddr(std::string const &addr)
 
         if (std::memcmp(h2.data(), u256_as_u8 + 7 + 21, 4) != 0)
         {
-            fprintf(stderr, "[!] Address checksum mismatch.\n");
+            fprintf(stderr, "[!] Address checksum mismatch: %s\n", addr.c_str());
         }
     }
 
