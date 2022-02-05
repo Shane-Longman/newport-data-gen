@@ -207,6 +207,7 @@ int main(int argc, char **argv)
                 auto * priv_as_bn_p = EC_KEY_get0_private_key(key_p);
                 auto * hex_p = BN_bn2hex(priv_as_bn_p);
                 printf("wut ??? %s\t%s\n", targets.addresses[tix].c_str(), hex_p);
+                fflush(stdout);
                 OPENSSL_free(hex_p);
             }
 
@@ -217,6 +218,7 @@ int main(int argc, char **argv)
                     auto * priv_as_bn_p = EC_KEY_get0_private_key(key_p);
                     auto * hex_p = BN_bn2hex(priv_as_bn_p);
                     printf("%s\t%03u\t%s\n", targets.addresses[tix].c_str(), ix, hex_p);
+                    fflush(stdout);
                     OPENSSL_free(hex_p);
                 }
             }
