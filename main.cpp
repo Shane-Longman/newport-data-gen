@@ -17,6 +17,8 @@
 #include <immintrin.h>
 #include <unistd.h>
 
+#define LIKELY(x) __builtin_expect((x),1)
+#define UNLIKELY(x) __builtin_expect((x),0)
 
 using uncompressed_key_t = std::array<std::uint8_t, 65>;
 using hash256_t = std::array<std::uint8_t, 32>;
@@ -172,9 +174,6 @@ int main(int argc, char **argv)
         read_targets_from_file(*args.maybe_address_fname, targets);
     }
 
-    auto const NTARGETS = targets.hashes.size();
-    printf("[i] %zu targets.\n", NTARGETS);
-
     pid_t const pid = getpid();
 
     EC_KEY *key_p = EC_KEY_new_by_curve_name(NID_secp256k1);
@@ -183,6 +182,7 @@ int main(int argc, char **argv)
     bool const infinite_loop = not args.maybe_ntries.has_value();
     auto const ntries = args.maybe_ntries.has_value() ? *args.maybe_ntries : 0;
 
+    auto const NTARGETS = targets.hashes.size();
     auto const NMASK_CHECKS = 1 + 160 - args.min_match_nbits;
     std::array<__v32qi, 160> const masks = make_masks(args.min_match_nbits);
 
@@ -202,12 +202,22 @@ int main(int argc, char **argv)
         for (auto tix = 0u; tix < NTARGETS; ++tix)
         {
             auto const diff = targets.hashes[tix].v32 ^ h160.v32;
+            if (UNLIKELY(_mm256_testz_si256((__m256i)diff, ~_mm256_setzero_si256()) != 0))
+            {
+                auto * priv_as_bn_p = EC_KEY_get0_private_key(key_p);
+                auto * hex_p = BN_bn2hex(priv_as_bn_p);
+                printf("wut ??? %s\t%s\n", targets.addresses[tix].c_str(), hex_p);
+                OPENSSL_free(hex_p);
+            }
 
             for (auto ix = 0u; ix < NMASK_CHECKS; ++ix)
             {
-                if (_mm256_testz_si256((__m256i)diff, (__m256i)masks[ix]) == 1)
+                if (UNLIKELY(_mm256_testz_si256((__m256i)diff, (__m256i)masks[ix]) != 0))
                 {
-                    printf("%s %u\n", targets.addresses[tix].c_str(), ix);
+                    auto * priv_as_bn_p = EC_KEY_get0_private_key(key_p);
+                    auto * hex_p = BN_bn2hex(priv_as_bn_p);
+                    printf("%s\t%03u\t%s\n", targets.addresses[tix].c_str(), ix, hex_p);
+                    OPENSSL_free(hex_p);
                 }
             }
         }

@@ -10,7 +10,7 @@ main: $(OSSL_DIR)/libcrypto.a main.cpp parse_args.cpp parse_args.hpp unaddr.cpp 
     $(OSSL_DIR)/libcrypto.a \
     -I$(OSSL_DIR) \
     -I$(OSSL_DIR)/include \
-    -O0 -ggdb
+    -O3
 
 $(OSSL_DIR)/libcrypto.a: $(OSSL_DIR)/config Makefile
 	patch --forward -p0 < patches/openssl-x86_64-bintuils-2.20.51.patch; [ $$? -lt 2 ]
