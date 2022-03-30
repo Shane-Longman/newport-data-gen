@@ -1,6 +1,7 @@
 main
 distanal
 bn_rand
+aladdin
 
 openssl-OpenSSL_0_9_8h.zip
 *.o
