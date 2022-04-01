@@ -4,5 +4,6 @@ include main.mk
 include aladdin.mk
 include distanal.mk
 include bn_rand.mk
+include tgen.mk
 
 include openssl.mk

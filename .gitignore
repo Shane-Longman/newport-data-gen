@@ -2,6 +2,7 @@ main
 distanal
 bn_rand
 aladdin
+tgen
 
 openssl-OpenSSL_0_9_8h.zip
 *.o
