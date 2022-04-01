@@ -21,6 +21,7 @@
 struct parsed_args
 {
     bool help = false;
+    bool with_pubkey = false;
     unsigned int min_match_nbits;
     std::optional<std::string> maybe_pubkey;
     std::optional<std::string> maybe_pubkey_fname;
@@ -104,6 +105,12 @@ int parse_args(int argc, char* argv[], parsed_args & parsed)
         {
             switch (c)
             {
+                case 'p':
+                {
+                    parsed.with_pubkey = true;
+
+                    break;
+                }
                 case 'n':
                 {
                     if (--argc > 0)
@@ -283,7 +290,31 @@ int main(int argc, char **argv)
             {
                 auto * priv_as_bn_p = EC_KEY_get0_private_key(key_p);
                 auto * hex_p = BN_bn2hex(priv_as_bn_p);
-                printf("%s\t%03u\t%s\n", targets.repr[tix].c_str(), matched, hex_p);
+                if (args.with_pubkey)
+                {
+                    std::array<char, 2 * 64 + 1> pub_str;
+
+                    for (auto ix = 0u; ix < pubkey.vi8.size(); ++ix)
+                    {
+                        {
+                            auto const nibble = pubkey.vi8[ix] >> 4;
+
+                            pub_str[2 * ix + 0] = nibble >= 10 ? nibble + 'A' - 10 : nibble + '0';
+                        }
+                        {
+                            auto const nibble = pubkey.vi8[ix] & 0xF;
+
+                            pub_str[2 * ix + 1] = nibble >= 10 ? nibble + 'A' - 10 : nibble + '0';
+                        }
+                    }
+                    pub_str.back() = 0;
+
+                    printf("%s\t%03u\t%s\t%s\n", targets.repr[tix].c_str(), matched, hex_p, pub_str.data());
+                }
+                else
+                {
+                    printf("%s\t%03u\t%s\n", targets.repr[tix].c_str(), matched, hex_p);
+                }
                 fflush(stdout);
                 OPENSSL_free(hex_p);
             }
